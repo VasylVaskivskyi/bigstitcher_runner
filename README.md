@@ -2,8 +2,8 @@
 
 #### Command line arguments
 
-**`--imagej_path`**    path to imagej executable
-**`--img_dir`**    path to directory with images\
+**`--imagej_path`**    path to imagej executable\
+**`--img_dirs`**    paths to directories with images to different cycles\
 **`--out_dir`**    path to store stitched images\
 **`--best_focus_dir`**    path to store best focused z planes\
 **`--submission_file_path`**    path to submission file\

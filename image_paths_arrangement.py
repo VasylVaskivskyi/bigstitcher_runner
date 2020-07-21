@@ -3,6 +3,14 @@ from typing import List, Dict, Set, Union
 import re
 
 
+def alpha_num_order(string: str) -> str:
+    """ Returns all numbers on 5 digits to let sort the string with numeric order.
+    Ex: alphaNumOrder("a6b12.125")  ==> "a00006b00012.00125"
+    """
+    return ''.join([format(int(x), '05d') if x.isdigit()
+                    else x for x in re.split(r'(\d+)', string)])
+
+
 def add_to_dict(dictionary: dict, key: Union[int, str], value: Union[dict, set, list]) -> dict:
     """ Will add key-value pair to dictionary, otherwise will update key-value pair """
     if key in dictionary:
@@ -65,7 +73,11 @@ def arrange_listing(listing: List[str]) -> Dict[int, Dict[int, Dict[int, str]]]:
     return arranged_listing
 
 
-def get_image_paths_arranged_in_dict(img_dir):
-    img_listing = get_img_listing(img_dir)
-    arranged_listing = arrange_listing(img_listing)
-    return arranged_listing
+def get_image_paths_arranged_in_dict(img_dirs: List[str]):
+    img_dirs.sort(key=alpha_num_order)
+    arranged_per_cycle = dict()
+    for i, cycle in enumerate(img_dirs, start=1):
+        img_listing = get_img_listing(cycle)
+        arranged_listing = arrange_listing(img_listing)
+        arranged_per_cycle[i] = arranged_listing
+    return arranged_per_cycle

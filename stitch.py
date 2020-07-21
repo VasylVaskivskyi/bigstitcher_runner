@@ -3,8 +3,8 @@ import os
 import os.path as osp
 from datetime import datetime
 import subprocess
-
 import json
+from typing import List
 
 from generate_bigstitcher_macro import BigStitcherMacro
 import best_z_plane_selection_with_cytokit_info
@@ -22,7 +22,7 @@ def load_submission_file(submission_file_path: str) -> dict:
 
 
 def get_values_from_submission_file(submission: dict) -> dict:
-    info_for_bigstitcher = dict(num_z_planes=1,  # for best focus use only 1 z-plane, else submission['num_z_planes']
+    info_for_bigstitcher = dict(num_cycles=submission['numCycles'],
                                 num_channels=submission['numChannels'],
                                 num_tiles=submission['numTiles'],
                                 num_tiles_x=submission['regionWidth'],
@@ -35,18 +35,16 @@ def get_values_from_submission_file(submission: dict) -> dict:
                                 pixel_distance_x=submission['xyResolution'],
                                 pixel_distance_y=submission['xyResolution'],
                                 pixel_distance_z=submission['zPitch'],
-                                reference_channel=submission['bestFocusReferenceChannel'],
-                                reference_z_plane=1  # because we are using best z-planes
+                                reference_channel=submission['bestFocusReferenceChannel']
                                 )
     return info_for_bigstitcher
 
 
-def generate_bigstitcher_macro(img_dir: str, out_dir: str, info_for_bigstitcher: dict) -> str:
+def generate_bigstitcher_macro(best_focus_dir: str, out_dir: str, info_for_bigstitcher: dict, num_cycles: int) -> str:
     macro = BigStitcherMacro()
-    macro.img_dir = img_dir
+    macro.img_dir = best_focus_dir
     macro.out_dir = out_dir
-    macro.num_z_planes = info_for_bigstitcher['num_z_planes']
-    macro.num_channels = info_for_bigstitcher['num_channels']
+    macro.num_channels = num_cycles * info_for_bigstitcher['num_channels']
     macro.num_tiles = info_for_bigstitcher['num_tiles']
     macro.num_tiles_x = info_for_bigstitcher['num_tiles_x']
     macro.num_tiles_y = info_for_bigstitcher['num_tiles_y']
@@ -57,43 +55,46 @@ def generate_bigstitcher_macro(img_dir: str, out_dir: str, info_for_bigstitcher:
     macro.pixel_distance_y = info_for_bigstitcher['pixel_distance_y']
     macro.pixel_distance_z = info_for_bigstitcher['pixel_distance_z']
     macro.reference_channel = info_for_bigstitcher['reference_channel']
-    macro.reference_z_plane = info_for_bigstitcher['reference_z_plane']
     macro_path = macro.generate()
 
     return macro_path
 
 
+def find_best_z_planes(img_dirs: List[str], best_focus_dir: str, cytokit_json_path: str):
+    best_z_plane_selection_with_cytokit_info.main(img_dirs, best_focus_dir, cytokit_json_path)
+
+
 def run_bigstitcher(imagej_path: str, bigstitcher_macro_path: str):
     command = imagej_path + " --headless --console -macro " + bigstitcher_macro_path
-
-    start = datetime.now()
-
     subprocess.run(command, shell=True)
 
-    print('elapsed', datetime.now() - start)
 
-
-def find_best_z_planes(img_dir: str, best_focus_dir: str, cytokit_json_path: str):
-    best_z_plane_selection_with_cytokit_info.main(img_dir, best_focus_dir, cytokit_json_path)
-
-
-def main(imagej_path: str, img_dir: str, out_dir: str, best_focus_dir: str, cytokit_json_path: str, submission_file_path: str):
+def main(imagej_path: str, img_dirs: List[str], out_dir: str, best_focus_dir: str, cytokit_json_path: str, submission_file_path: str):
+    start = datetime.now()
+    print('\nStarted', start)
 
     make_dir_if_not_exists(best_focus_dir)
     make_dir_if_not_exists(out_dir)
 
+    print('\nCreating ImageJ macro file')
+
     submission = load_submission_file(submission_file_path)
     info_for_bigstitcher = get_values_from_submission_file(submission)
-    bigstitcher_macro_path = generate_bigstitcher_macro(best_focus_dir, out_dir, info_for_bigstitcher)
+    num_cycles = len(img_dirs)
+    bigstitcher_macro_path = generate_bigstitcher_macro(best_focus_dir, out_dir, info_for_bigstitcher, num_cycles)
 
-    find_best_z_planes(img_dir, best_focus_dir, cytokit_json_path)
+    print('\nSelecting best z-planes')
+    find_best_z_planes(img_dirs, best_focus_dir, cytokit_json_path)
+    print('\nStarting stitching')
     run_bigstitcher(imagej_path, bigstitcher_macro_path)
+
+    print('\nTime elapsed', datetime.now() - start)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--imagej_path', type=str, help='path to imagej executable')
-    parser.add_argument('--img_dir', type=str, help='path to directory with images')
+    parser.add_argument('--img_dirs', type=str, nargs='+', help='space separated list of dirs with images')
     parser.add_argument('--out_dir', type=str, help='path to store stitched images')
     parser.add_argument('--best_focus_dir', type=str, help='path to store best focused z planes')
     parser.add_argument('--submission_file_path', type=str, help='path to submission file')
@@ -101,4 +102,4 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    main(args.imagej_path, args.img_dir, args.out_dir, args.best_focus_dir, args.cytokit_json_path, args.submission_file_path)
+    main(args.imagej_path, args.img_dirs, args.out_dir, args.best_focus_dir, args.cytokit_json_path, args.submission_file_path)
