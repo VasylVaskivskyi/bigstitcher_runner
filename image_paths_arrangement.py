@@ -1,4 +1,6 @@
 import os
+import os.path as osp
+import posixpath as px
 from typing import List, Dict, Set, Union
 import re
 
@@ -56,7 +58,7 @@ def create_arrangement_skeleton_by_channel_tile_zplane(listing: List[str]) -> Di
     return tile_arrangement
 
 
-def arrange_listing(listing: List[str]) -> Dict[int, Dict[int, Dict[int, str]]]:
+def arrange_listing(img_dir: str, listing: List[str]) -> Dict[int, Dict[int, Dict[int, str]]]:
     pattern = "1_{tile:05d}_Z{zplane:03d}_CH{channel:d}.tif"
 
     tile_arrangement = create_arrangement_skeleton_by_channel_tile_zplane(listing)
@@ -66,18 +68,15 @@ def arrange_listing(listing: List[str]) -> Dict[int, Dict[int, Dict[int, str]]]:
         for tile in tile_arrangement[channel]:
             for zplane in tile_arrangement[channel][tile]:
                 file_name = pattern.format(tile=tile, zplane=zplane, channel=channel)
-
+                file_path = px.join(img_dir, file_name)
                 arranged_listing = add_to_dict(arranged_listing, channel, {})
-                arranged_listing[channel] = add_to_dict(arranged_listing[channel], tile, {zplane: file_name})
+                arranged_listing[channel] = add_to_dict(arranged_listing[channel], tile, {zplane: file_path})
 
     return arranged_listing
 
 
-def get_image_paths_arranged_in_dict(img_dirs: List[str]):
-    img_dirs.sort(key=alpha_num_order)
-    arranged_per_cycle = dict()
-    for i, cycle in enumerate(img_dirs, start=1):
-        img_listing = get_img_listing(cycle)
-        arranged_listing = arrange_listing(img_listing)
-        arranged_per_cycle[i] = arranged_listing
-    return arranged_per_cycle
+def get_image_paths_arranged_in_dict(img_dir: str):
+    img_listing = get_img_listing(img_dir)
+    arranged_listing = arrange_listing(img_dir, img_listing)
+
+    return arranged_listing

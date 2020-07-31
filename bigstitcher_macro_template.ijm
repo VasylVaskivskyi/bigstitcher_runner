@@ -2,16 +2,15 @@
 run("BigStitcher",
     "select=define" +
     " define_dataset=[Manual Loader (Bioformats based)]" +
-    " project_filename={img_dir}{xml_file_name}" +
-    " multiple_timepoints=[YES (one file per time-point)]" +
-    " multiple_channels=[YES (one file per channel)]" +
+    " project_filename={path_to_xml_file}" +
+    " multiple_timepoints=[NO (one time-point)]" +
+    " multiple_channels=[NO (one channel)]" +
     " _____multiple_illumination_directions=[NO (one illumination direction)]" +
     " multiple_angles=[NO (one angle)]" +
     " multiple_tiles=[YES (one file per tile)]" +
     " image_file_directory={img_dir}" +
     " image_file_pattern={pattern}" +
     " timepoints_=1" +
-    " channels_={num_channels}" +
     " tiles_={num_tiles}" +
     " move_tiles_to_grid_(per_angle)?=[Move Tile to Grid (Macro-scriptable)]" +
     " grid_type=[Snake: Right & Down      ]" +
@@ -31,7 +30,7 @@ run("BigStitcher",
 
 // calculate pairwise shifts
 run("Calculate pairwise shifts ...",
-    "select={img_dir}{xml_file_name}" +
+    "select={path_to_xml_file}" +
     " process_angle=[All angles]" +
     " process_channel=[All channels]" +
     " process_illumination=[All illuminations]" +
@@ -41,7 +40,7 @@ run("Calculate pairwise shifts ...",
 
 // filter shifts with 0.7 corr. threshold
 run("Filter pairwise shifts ...",
-    "select={img_dir}{xml_file_name}" +
+    "select={path_to_xml_file}" +
     " filter_by_link_quality" +
     " min_r=0.7" +
     " max_r=1" +
@@ -52,7 +51,7 @@ run("Filter pairwise shifts ...",
 
 // do global optimization
 run("Optimize globally and apply shifts ...",
-    "select={img_dir}{xml_file_name}" +
+    "select={path_to_xml_file}" +
     " process_angle=[All angles]" +
     " process_channel=[All channels]" +
     " process_illumination=[All illuminations]" +
@@ -65,7 +64,7 @@ run("Optimize globally and apply shifts ...",
 
 // fuse dataset, save as TIFF
 run("Fuse dataset ...",
-    "select={img_dir}{xml_file_name}" +
+    "select={path_to_xml_file}" +
     " process_angle=[All angles]" +
     " process_channel=[All channels]" +
     " process_illumination=[All illuminations]" +
