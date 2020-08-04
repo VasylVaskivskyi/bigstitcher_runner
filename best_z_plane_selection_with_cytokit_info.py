@@ -4,19 +4,75 @@ import posixpath as px
 from typing import List, Dict, Set, Union, Tuple
 import re
 import json
-import argparse
-import shutil
-import heapq
-import tifffile as tif
+
+import numpy as np
+from scipy import interpolate
 
 
-from image_paths_arrangement import get_image_paths_arranged_in_dict, alpha_num_order
+def interpolate_nans(array):
+    x = np.arange(0, array.shape[1])
+    y = np.arange(0, array.shape[0])
+    # mask invalid values
+    array = np.ma.masked_invalid(array)
+    xx, yy = np.meshgrid(x, y)
+    # get only the valid values
+    x1 = xx[~array.mask]
+    y1 = yy[~array.mask]
+    newarr = array[~array.mask]
+
+    interpolated = interpolate.griddata((x1, y1), newarr.ravel(),
+                                        (xx, yy), method='linear')
+
+    return np.round(interpolated)
 
 
-def get_top3_best_focused_plane_ids(scores):
-    top3_ids_with_scores = heapq.nlargest(3, zip(scores, range(0, len(scores))), key=lambda x: x[0])
-    top3_ids = [i[1] for i in top3_ids_with_scores]
-    return sorted(top3_ids)
+def validate_best_z(array: np.ndarray, max_diff: int = 3):
+
+    hor_diff = np.abs(np.diff(array, axis=1))
+    ver_diff = np.abs(np.diff(array, axis=0))
+
+    hd = np.append(hor_diff, hor_diff[:, -1][:, np.newaxis], axis=1)
+    vd = np.append(ver_diff, ver_diff[-1, :][np.newaxis, :], axis=0)
+
+    # coordinates of outliers
+    hor_outliers = np.argwhere(hd > max_diff).tolist()
+    ver_outliers = np.argwhere(vd > max_diff).tolist()
+
+    # true outlier if it is outlier in both x and y direction
+    true_outliers = []
+    for x in hor_outliers:
+        if x in ver_outliers:
+            true_outliers.append(tuple(x))
+
+    for out_coord in true_outliers:
+        array[out_coord] = np.nan
+
+    result = interpolate_nans(array)
+    return result
+
+
+def pick_z_planes_below_and_above(best_z: int, max_z: int, above: int, below: int):
+    above_check = best_z + above - max_z
+    if above_check > 0:
+        above -= above_check
+
+    below_check = best_z - below
+    if below_check < 0:
+        below += below_check
+
+    if max_z == 1:
+        return [best_z]
+    elif best_z == max_z:
+        below_planes = [best_z - i for i in range(1, below + 1)]
+        above_planes = []
+    elif best_z == 0:
+        below_planes = []
+        above_planes = [best_z + i for i in range(1, above + 1)]
+    else:
+        below_planes = [best_z - i for i in range(1, below + 1)]
+        above_planes = [best_z + i for i in range(1, above + 1)]
+
+    return below_planes + [best_z] + above_planes
 
 
 def get_info_about_best_focal_plane_per_tile(path_to_json: str):
@@ -24,15 +80,31 @@ def get_info_about_best_focal_plane_per_tile(path_to_json: str):
         json_file = json.load(stream)
 
     # dictionary where each key is index of tile, and value is index of best z plane, starts from 1
-    best_z_planes_per_tile = dict()
-
+    best_z_planes = []
+    tile_positions = []
+    tile_ids = []
+    num_zplanes_per_tile = []
     for tile in json_file['focal_plane_selector']:
-        tile_index = tile['tile_index'] + 1
-        scores = tile['scores']
-        top3_best_z = get_top3_best_focused_plane_ids(scores)
-        #best_z = tile['best_z'] + 1
-        top3_best_z = [i+1 for i in top3_best_z]
-        best_z_planes_per_tile[tile_index] = top3_best_z
+        best_z_planes.append(tile['best_z'])
+        tile_positions.append((tile['tile_y'], tile['tile_x']))
+        tile_ids.append(tile['tile_index'])
+        num_zplanes_per_tile.append(len(tile['scores']))
+
+    max_position = max(tile_positions)
+    array_shape = (max_position[0] + 1, max_position[1] + 1)
+    best_z_per_tile_array = np.zeros(array_shape)
+
+    for i, tile in enumerate(tile_positions):
+        best_z_per_tile_array[tile] = best_z_planes[i]
+
+    valid_best_z_array = validate_best_z(best_z_per_tile_array, max_diff=3)
+
+    best_z_planes_per_tile = dict()
+    for i, tile_id in enumerate(tile_ids):
+        best_z = valid_best_z_array[tile_positions[i]]
+        top_best_z = pick_z_planes_below_and_above(best_z, num_zplanes_per_tile[i], 1, 1)
+        top_best_z = [i + 1 for i in top_best_z]
+        best_z_planes_per_tile[tile_id + 1] = top_best_z
 
     return best_z_planes_per_tile
 

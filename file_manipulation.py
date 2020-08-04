@@ -30,7 +30,7 @@ def copy_to_destination(best_z_plane_paths: List[tuple]):
     for src, dst in best_z_plane_paths:
         img = project_stack(src)
         tif.imwrite(dst, img)
-        #shutil.copy(src, dst)
+        #shutil.copy(src[0], dst)
 
 
 def make_dir_if_not_exists(dir_path: str):
