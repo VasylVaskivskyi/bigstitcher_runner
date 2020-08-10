@@ -23,20 +23,20 @@ def interpolate_nans(array):
     interpolated = interpolate.griddata((x1, y1), newarr.ravel(),
                                         (xx, yy), method='linear')
 
-    return np.round(interpolated)
+    return np.round(interpolated).astype(np.int32)
 
 
-def validate_best_z(array: np.ndarray, max_diff: int = 3):
+def validate_best_z(array: np.ndarray):
 
     hor_diff = np.abs(np.diff(array, axis=1))
     ver_diff = np.abs(np.diff(array, axis=0))
-
+    std = np.std(array)
     hd = np.append(hor_diff, hor_diff[:, -1][:, np.newaxis], axis=1)
     vd = np.append(ver_diff, ver_diff[-1, :][np.newaxis, :], axis=0)
 
     # coordinates of outliers
-    hor_outliers = np.argwhere(hd > max_diff).tolist()
-    ver_outliers = np.argwhere(vd > max_diff).tolist()
+    hor_outliers = np.argwhere(hd > std).tolist()
+    ver_outliers = np.argwhere(vd > std).tolist()
 
     # true outlier if it is outlier in both x and y direction
     true_outliers = []
@@ -97,7 +97,7 @@ def get_info_about_best_focal_plane_per_tile(path_to_json: str):
     for i, tile in enumerate(tile_positions):
         best_z_per_tile_array[tile] = best_z_planes[i]
 
-    valid_best_z_array = validate_best_z(best_z_per_tile_array, max_diff=3)
+    valid_best_z_array = validate_best_z(best_z_per_tile_array)
 
     best_z_planes_per_tile = dict()
     for i, tile_id in enumerate(tile_ids):
